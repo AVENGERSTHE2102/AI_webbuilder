@@ -81,32 +81,37 @@ class AppGenerator:
         Returns:
             AppSpecification with entity name, fields, app type
         """
-        prompt = f"""You are analyzing an app description to extract structured parameters.
+        prompt = f"""You are an expert at analyzing app descriptions and extracting detailed specifications.
 
-Description: "{description}"
+User wants to build: "{description}"
 
-Extract and output ONLY valid JSON (no other text):
+Analyze this description and extract the core entity, fields, and requirements. Be specific and thoughtful about what fields make sense for this app.
+
+Output ONLY valid JSON (no markdown, no explanation):
 {{
   "entity_name": "Recipe",
   "entity_name_lower": "recipe",
   "app_type": "crud_list_manager",
-  "description": "Recipe manager app",
+  "description": "Recipe manager with ingredients and cooking steps",
   "fields": [
-    {{"name": "name", "type": "str", "required": true, "placeholder": "Recipe name"}},
-    {{"name": "ingredients", "type": "List[str]", "required": true, "placeholder": "One per line"}},
-    {{"name": "steps", "type": "List[str]", "required": true, "placeholder": "Cooking steps"}}
+    {{"name": "title", "type": "str", "required": true, "placeholder": "Recipe name"}},
+    {{"name": "description", "type": "str", "required": false, "placeholder": "Brief description"}},
+    {{"name": "ingredients", "type": "List[str]", "required": true, "placeholder": "Ingredients (one per line)"}},
+    {{"name": "instructions", "type": "List[str]", "required": true, "placeholder": "Cooking steps"}},
+    {{"name": "prepTime", "type": "str", "required": false, "placeholder": "Prep time"}},
+    {{"name": "cookTime", "type": "str", "required": false, "placeholder": "Cook time"}}
   ]
 }}
 
-Rules:
-- entity_name: Capitalized singular noun (e.g., "Recipe", "Todo", "Contact")
-- entity_name_lower: Lowercase version for variables
-- app_type: Must be "crud_list_manager" (only supported type for now)
-- fields: 2-6 fields maximum
-- field types: "str", "int", "float", "bool", "List[str]"
-- If unclear, use generic "Item" as entity_name
+Requirements:
+- entity_name: Singular noun from the description (Recipe, Todo, Contact, Book, etc.)
+- fields: Extract 3-8 relevant fields based on what makes sense for this type of app
+- field types: str, int, float, bool, List[str]
+- Think about what fields are essential vs optional for this app type
+- Make placeholders helpful and specific
+- app_type: "crud_list_manager"
 
-Output ONLY the JSON, nothing else."""
+Output ONLY the JSON."""
 
         try:
             response = await self._call_claude_api(prompt)
@@ -134,7 +139,7 @@ Output ONLY the JSON, nothing else."""
 
     async def generate_code_blocks(self, spec: AppSpecification) -> CodeBlocks:
         """
-        Uses AI to generate specific code blocks for the app.
+        Uses AI to generate complete, customized code for the app.
 
         Args:
             spec: App specification
@@ -142,52 +147,89 @@ Output ONLY the JSON, nothing else."""
         Returns:
             CodeBlocks with Pydantic model, endpoints, React components
         """
-        # Build field descriptions for prompt
+        # Build detailed field descriptions
         fields_desc = "\n".join([
-            f"- {f.name}: {f.type} ({'required' if f.required else 'optional'})"
+            f"- {f.name}: {f.type} ({'required' if f.required else 'optional'}) - placeholder: '{f.placeholder}'"
             for f in spec.fields
         ])
 
-        prompt = f"""Generate Python and React code blocks for a {spec.entity_name} manager app.
+        prompt = f"""You are an expert full-stack developer. Generate production-ready code for a {spec.entity_name} management application.
+
+App Description: {spec.description}
 
 Entity: {spec.entity_name}
 Fields:
 {fields_desc}
 
-Generate ONLY valid JSON:
+Generate complete, customized code. Output ONLY valid JSON (no markdown):
 {{
-  "pydantic_model": "class {spec.entity_name}(BaseModel):\\n    id: Optional[int] = None\\n    ...",
-  "api_endpoints": "# CRUD endpoints code here",
-  "react_form_fields": "{{/* JSX form fields */}}",
-  "react_list_item": "{{/* JSX for displaying one item */}}"
+  "pydantic_model": "complete Pydantic model code",
+  "api_endpoints": "complete FastAPI endpoint code",
+  "react_form_fields": "complete JSX form code",
+  "react_list_item": "complete JSX display code"
 }}
 
-Requirements for pydantic_model:
-- Include all fields from spec
-- id field is Optional[int] = None
-- Use proper Python types (str, int, List[str], etc.)
-- No TODO or placeholder comments
+PYDANTIC MODEL - Generate this EXACT structure:
+```python
+class {spec.entity_name}(BaseModel):
+    id: Optional[int] = None
+    # Add all fields with proper types
+    # Include Field() validators where appropriate
+```
 
-Requirements for api_endpoints:
-- GET /{spec.entity_name_lower} - return {spec.entity_name_lower}_store
-- POST /{spec.entity_name_lower} - add to store with next_id
-- GET /{spec.entity_name_lower}/{{id}} - return single item
-- DELETE /{spec.entity_name_lower}/{{id}} - remove from store
-- Include try-except with HTTPException
-- Use global next_id variable
+API ENDPOINTS - Generate COMPLETE working endpoints:
+```python
+@app.get("/{spec.entity_name_lower}")
+async def get_all_{spec.entity_name_lower}s():
+    return {spec.entity_name_lower}_store
 
-Requirements for react_form_fields:
-- One input/textarea per field (except id)
+@app.post("/{spec.entity_name_lower}")
+async def create_{spec.entity_name_lower}(item: {spec.entity_name}):
+    global next_id
+    try:
+        item.id = next_id
+        next_id += 1
+        {spec.entity_name_lower}_store.append(item)
+        return item
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/{spec.entity_name_lower}/{{item_id}}")
+async def get_{spec.entity_name_lower}(item_id: int):
+    for item in {spec.entity_name_lower}_store:
+        if item.id == item_id:
+            return item
+    raise HTTPException(status_code=404, detail="{spec.entity_name} not found")
+
+@app.delete("/{spec.entity_name_lower}/{{item_id}}")
+async def delete_{spec.entity_name_lower}(item_id: int):
+    global {spec.entity_name_lower}_store
+    {spec.entity_name_lower}_store = [item for item in {spec.entity_name_lower}_store if item.id != item_id]
+    return {{"message": "{spec.entity_name} deleted successfully"}}
+```
+
+REACT FORM FIELDS - Generate beautiful, functional form inputs:
+- Use proper input types (text, number, textarea, etc.)
+- Include all fields with their specific placeholders
+- Proper labels with capitalized names
 - Use formData state and handleInputChange
-- Include labels and placeholders
-- Wrap in div.form-group
+- Make List[str] fields use textarea with instructions
 
-Requirements for react_list_item:
-- Display all fields of the item
-- Use proper JSX syntax
-- Include item.id as key
+REACT LIST ITEM - Generate attractive card display:
+- Show all important fields
+- Use proper formatting for different data types
+- List[str] fields should map to <ul><li> elements
+- Include visual hierarchy (title bigger, metadata smaller)
+- Add icons or emojis where appropriate
 
-Output ONLY the JSON."""
+IMPORTANT:
+- NO placeholder comments like "// Add fields here"
+- Generate COMPLETE working code
+- Make it specific to {spec.entity_name}, not generic
+- All fields should be properly implemented
+- Code should be production-ready
+
+Output ONLY the JSON with these 4 code blocks.
 
         try:
             response = await self._call_claude_api(prompt)
@@ -325,14 +367,22 @@ Output ONLY the JSON."""
         )
 
     def _get_default_code_blocks(self, spec: AppSpecification) -> CodeBlocks:
-        """Generates default code blocks without AI"""
-        # Build Pydantic model
+        """Generates custom code blocks based on specification"""
+        # Build Pydantic model with proper field definitions
         model_fields = ["    id: Optional[int] = None"]
         for field in spec.fields:
+            # Add field descriptions for better API docs
+            field_desc = f' description="{field.placeholder}"' if field.placeholder else ''
             if field.required:
-                model_fields.append(f"    {field.name}: {field.type}")
+                if field.type.startswith("List"):
+                    model_fields.append(f"    {field.name}: {field.type} = Field(default_factory=list,{field_desc})")
+                else:
+                    model_fields.append(f"    {field.name}: {field.type} = Field(...,{field_desc})")
             else:
-                model_fields.append(f"    {field.name}: Optional[{field.type}] = None")
+                if field.type.startswith("List"):
+                    model_fields.append(f"    {field.name}: Optional[{field.type}] = Field(default_factory=list,{field_desc})")
+                else:
+                    model_fields.append(f"    {field.name}: Optional[{field.type}] = Field(None,{field_desc})")
 
         pydantic_model = f"class {spec.entity_name}(BaseModel):\n" + "\n".join(model_fields)
 
@@ -371,52 +421,153 @@ async def delete_{spec.entity_name_lower}(item_id: int):
     return {{"message": "{spec.entity_name} deleted successfully"}}
 """
 
-        # Build React form fields
+        # Build React form fields with proper input types
         form_fields = []
         for field in spec.fields:
-            if field.type == "str":
+            label = field.name.replace('_', ' ').replace('Time', ' Time').replace('Date', ' Date').title()
+
+            if field.type == "int":
                 form_fields.append(f"""            <div className="form-group">
-              <label htmlFor="{field.name}">{field.name.replace('_', ' ').title()}</label>
+              <label htmlFor="{field.name}">{label}</label>
+              <input
+                type="number"
+                id="{field.name}"
+                name="{field.name}"
+                value={{formData.{field.name}}}
+                onChange={{handleInputChange}}
+                placeholder="{field.placeholder or label}"
+                required={{{str(field.required).lower()}}}
+              />
+            </div>""")
+            elif field.type == "float":
+                form_fields.append(f"""            <div className="form-group">
+              <label htmlFor="{field.name}">{label}</label>
+              <input
+                type="number"
+                step="0.01"
+                id="{field.name}"
+                name="{field.name}"
+                value={{formData.{field.name}}}
+                onChange={{handleInputChange}}
+                placeholder="{field.placeholder or label}"
+                required={{{str(field.required).lower()}}}
+              />
+            </div>""")
+            elif field.type == "bool":
+                form_fields.append(f"""            <div className="form-group">
+              <label htmlFor="{field.name}">
+                <input
+                  type="checkbox"
+                  id="{field.name}"
+                  name="{field.name}"
+                  checked={{formData.{field.name}}}
+                  onChange={{handleInputChange}}
+                />
+                {label}
+              </label>
+            </div>""")
+            elif field.type in ["List[str]", "list"]:
+                form_fields.append(f"""            <div className="form-group">
+              <label htmlFor="{field.name}">{label}</label>
+              <textarea
+                id="{field.name}"
+                name="{field.name}"
+                value={{formData.{field.name}}}
+                onChange={{handleInputChange}}
+                placeholder="{field.placeholder or 'Enter ' + label.lower() + ' (one per line)'}"
+                rows="4"
+                required={{{str(field.required).lower()}}}
+              />
+              <small>Enter each item on a new line</small>
+            </div>""")
+            elif 'name' in field.name.lower() or 'title' in field.name.lower():
+                # Make name/title fields larger
+                form_fields.append(f"""            <div className="form-group">
+              <label htmlFor="{field.name}">{label}</label>
               <input
                 type="text"
                 id="{field.name}"
                 name="{field.name}"
                 value={{formData.{field.name}}}
                 onChange={{handleInputChange}}
-                placeholder="{field.placeholder or field.name}"
+                placeholder="{field.placeholder or label}"
                 required={{{str(field.required).lower()}}}
+                className="input-large"
               />
             </div>""")
-            elif field.type in ["List[str]", "list"]:
+            elif 'description' in field.name.lower() or 'notes' in field.name.lower():
+                # Make description fields textarea
                 form_fields.append(f"""            <div className="form-group">
-              <label htmlFor="{field.name}">{field.name.replace('_', ' ').title()}</label>
+              <label htmlFor="{field.name}">{label}</label>
               <textarea
                 id="{field.name}"
                 name="{field.name}"
                 value={{formData.{field.name}}}
                 onChange={{handleInputChange}}
-                placeholder="{field.placeholder or field.name + ' (one per line)'}"
+                placeholder="{field.placeholder or label}"
+                rows="3"
+                required={{{str(field.required).lower()}}}
+              />
+            </div>""")
+            else:
+                # Default text input
+                form_fields.append(f"""            <div className="form-group">
+              <label htmlFor="{field.name}">{label}</label>
+              <input
+                type="text"
+                id="{field.name}"
+                name="{field.name}"
+                value={{formData.{field.name}}}
+                onChange={{handleInputChange}}
+                placeholder="{field.placeholder or label}"
                 required={{{str(field.required).lower()}}}
               />
             </div>""")
 
         react_form_fields = "\n".join(form_fields)
 
-        # Build React list item display
-        list_item_content = [f"<h3>{{item.name || 'Item #' + item.id}}</h3>"]
+        # Build React list item display with smart formatting
+        # Find the title field (name, title, or first string field)
+        title_field = next((f for f in spec.fields if 'name' in f.name.lower() or 'title' in f.name.lower()), spec.fields[0] if spec.fields else None)
+
+        list_item_content = []
+        if title_field:
+            list_item_content.append(f"<h3>{{item.{title_field.name} || '{spec.entity_name} #' + item.id}}</h3>")
+
         for field in spec.fields:
-            if field.name != "name":
-                if field.type in ["List[str]", "list"]:
-                    list_item_content.append(f"""                <div>
-                  <strong>{field.name.replace('_', ' ').title()}:</strong>
-                  <ul>
-                    {{item.{field.name} && item.{field.name}.split('\\n').map((line, i) => (
+            if field == title_field:
+                continue  # Already used as title
+
+            label = field.name.replace('_', ' ').replace('Time', ' Time').replace('Date', ' Date').title()
+
+            if field.type in ["List[str]", "list"]:
+                list_item_content.append(f"""                <div className="field-section">
+                  <strong>{label}:</strong>
+                  <ul className="field-list">
+                    {{item.{field.name} && item.{field.name}.split('\\n').filter(line => line.trim()).map((line, i) => (
                       <li key={{i}}>{{line}}</li>
                     ))}}
                   </ul>
                 </div>""")
-                else:
-                    list_item_content.append(f"<p><strong>{field.name.replace('_', ' ').title()}:</strong> {{item.{field.name}}}</p>")
+            elif field.type == "bool":
+                list_item_content.append(f"""                <div className="field-section">
+                  <strong>{label}:</strong> {{item.{field.name} ? '✅ Yes' : '❌ No'}}
+                </div>""")
+            elif 'description' in field.name.lower() or 'notes' in field.name.lower():
+                list_item_content.append(f"""                <div className="field-section">
+                  <strong>{label}:</strong>
+                  <p className="description-text">{{item.{field.name}}}</p>
+                </div>""")
+            elif field.type in ["int", "float"]:
+                list_item_content.append(f"""                <div className="field-section">
+                  <span className="field-label">{label}:</span>
+                  <span className="field-value">{{item.{field.name}}}</span>
+                </div>""")
+            else:
+                list_item_content.append(f"""                <div className="field-section">
+                  <span className="field-label">{label}:</span>
+                  <span className="field-value">{{item.{field.name}}}</span>
+                </div>""")
 
         react_list_item = "\n".join(list_item_content)
 
