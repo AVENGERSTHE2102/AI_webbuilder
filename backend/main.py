@@ -5,13 +5,15 @@ Main API server that orchestrates the generation pipeline.
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 from datetime import datetime
 import io
 import zipfile
 import os
 from typing import Dict
+from pathlib import Path
 
 from models import GenerateRequest, GenerateResponse, TemplateInfo
 from generator import generator
@@ -261,6 +263,24 @@ def create_zip_package(files: Dict[str, str], app_id: str) -> bytes:
     return zip_buffer.read()
 
 
+# Mount frontend static files (for production)
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+
+    @app.get("/", response_class=FileResponse)
+    async def serve_frontend():
+        """Serve the frontend index.html"""
+        return FileResponse(str(frontend_dist / "index.html"))
+
+    @app.get("/{full_path:path}", response_class=FileResponse)
+    async def serve_spa(full_path: str):
+        """Serve SPA - all routes go to index.html"""
+        file_path = frontend_dist / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(frontend_dist / "index.html"))
+
 if __name__ == "__main__":
     print("=" * 60)
     print("🚀 Zero-Code AI App Builder - Backend Server")
@@ -273,7 +293,7 @@ if __name__ == "__main__":
     print("💡 Example usage:")
     print('   POST /api/generate {"description": "A todo list app"}')
     print()
-    print("⚠️  Make sure to set ANTHROPIC_API_KEY in .env file")
+    print("⚠️  Make sure to set OPENROUTER_API_KEY or ANTHROPIC_API_KEY in .env file")
     print()
     print("=" * 60)
     print()

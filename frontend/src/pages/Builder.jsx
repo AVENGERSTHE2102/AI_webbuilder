@@ -6,7 +6,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import LivePreview from '../components/LivePreview';
 import './Builder.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Use relative URL for API calls (works in production when served from same domain)
+const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
 function Builder() {
   const [description, setDescription] = useState('');
