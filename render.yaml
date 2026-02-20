@@ -21,9 +21,8 @@ services:
     healthCheckPath: /
 
   # Frontend Static Site (React + Vite)
-  - type: web
+  - type: static
     name: zero-code-builder-frontend
-    runtime: node
     plan: free
     region: oregon
     buildCommand: cd frontend && npm install && npm run build
