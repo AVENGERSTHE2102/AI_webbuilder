@@ -27,16 +27,24 @@ app = FastAPI(
 )
 
 # CORS Configuration
-# Allow all origins for development and deployment flexibility
-# For production with custom domain, specify exact origins
+# Allow Vercel frontend and all origins for flexibility
 cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+if cors_origins == ["*"]:
+    # Allow all origins (includes Vercel, local dev, etc.)
+    allowed_origins = ["*"]
+else:
+    allowed_origins = cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins if cors_origins != ["*"] else ["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Log CORS configuration
+print(f"✅ CORS enabled for origins: {allowed_origins}")
 
 # In-memory storage for generated apps (temporary)
 app_storage: Dict[str, bytes] = {}
