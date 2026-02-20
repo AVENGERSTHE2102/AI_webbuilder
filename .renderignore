@@ -1,0 +1,50 @@
+# Files to ignore during Render deployment
+
+# Development
+.env
+.env.local
+.env.development
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation (optional - keep if you want them deployed)
+# IMPLEMENTATION_SUMMARY.md
+# SETUP_CHECKLIST.md
+
+# Build artifacts
+dist/
+build/
+*.zip
+
+# Logs
+*.log
+
+# Test files
+__tests__/
+*.test.js
+*.spec.js
