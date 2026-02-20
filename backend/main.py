@@ -42,9 +42,9 @@ app.add_middleware(
 app_storage: Dict[str, bytes] = {}
 
 
-@app.get("/")
-async def root():
-    """Health check endpoint"""
+@app.get("/api")
+async def api_root():
+    """API health check endpoint"""
     return {
         "status": "online",
         "service": "Zero-Code AI App Builder",
@@ -265,21 +265,48 @@ def create_zip_package(files: Dict[str, str], app_id: str) -> bytes:
 
 # Mount frontend static files (for production)
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
-if frontend_dist.exists():
-    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+if frontend_dist.exists() and (frontend_dist / "index.html").exists():
+    print(f"✅ Serving frontend from: {frontend_dist}")
 
+    # Mount assets directory
+    if (frontend_dist / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+
+    # Serve index.html for root and all non-API routes
     @app.get("/", response_class=FileResponse)
-    async def serve_frontend():
-        """Serve the frontend index.html"""
+    async def serve_frontend_root():
+        """Serve the frontend index.html at root"""
         return FileResponse(str(frontend_dist / "index.html"))
 
     @app.get("/{full_path:path}", response_class=FileResponse)
-    async def serve_spa(full_path: str):
-        """Serve SPA - all routes go to index.html"""
+    async def serve_spa_routes(full_path: str):
+        """Serve SPA - all non-API routes go to index.html"""
+        # Don't intercept API routes
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="API endpoint not found")
+
+        # Try to serve the file if it exists
         file_path = frontend_dist / full_path
         if file_path.is_file():
             return FileResponse(str(file_path))
+
+        # Otherwise serve index.html for SPA routing
         return FileResponse(str(frontend_dist / "index.html"))
+else:
+    print(f"⚠️ Frontend dist not found at: {frontend_dist}")
+    print("   API-only mode - frontend not available")
+
+    @app.get("/")
+    async def root():
+        """Health check when frontend is not available"""
+        return {
+            "status": "online",
+            "service": "Zero-Code AI App Builder API",
+            "version": "1.0.0",
+            "timestamp": datetime.now().isoformat(),
+            "message": "Frontend not built. Run: cd frontend && npm install && npm run build",
+            "api_docs": "/docs"
+        }
 
 if __name__ == "__main__":
     print("=" * 60)
