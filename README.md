@@ -12,7 +12,8 @@ Describe your app idea in natural language → Get a working React + FastAPI app
 
 - **Node.js 18+** ([Download](https://nodejs.org))
 - **Python 3.8+** (Check: `python --version`)
-- **Claude API Key** ([Get free key](https://console.anthropic.com/))
+- **OpenRouter API Key** ([Get $5 free credits](https://openrouter.ai/))
+  - Alternative: Direct Anthropic API key ([console.anthropic.com](https://console.anthropic.com/))
 
 ### Setup
 
@@ -25,7 +26,8 @@ Describe your app idea in natural language → Get a working React + FastAPI app
    ```bash
    cd backend
    cp .env.example .env
-   # Edit .env and add your ANTHROPIC_API_KEY
+   # Edit .env and add your OPENROUTER_API_KEY
+   # Get free $5 credits at: https://openrouter.ai/
    ```
 
 3. **Start Backend** (Terminal 1)

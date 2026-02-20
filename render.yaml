@@ -10,8 +10,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: OPENROUTER_API_KEY
+        sync: false  # Set this in Render dashboard (Recommended)
       - key: ANTHROPIC_API_KEY
-        sync: false  # Set this in Render dashboard
+        sync: false  # Alternative: Set this instead of OpenRouter
       - key: PORT
         value: 8000
       - key: HOST
