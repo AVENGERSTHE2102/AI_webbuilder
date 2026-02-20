@@ -36,16 +36,30 @@ class AppGenerator:
             GeneratedApp with all files ready for download
         """
         try:
+            # Check API key first
+            if not self.api_key:
+                print("❌ ERROR: OPENROUTER_API_KEY not configured!")
+                print("   Set it in Render Dashboard: https://dashboard.render.com")
+                print("   Get free $5 credits at: https://openrouter.ai/")
+                raise ValueError("OPENROUTER_API_KEY not set - cannot generate custom code")
+
+            print(f"✅ API Key found: {self.api_key[:8]}...")
+
             # Step 1: Extract app specification from description
+            print("📋 Step 1: Extracting app specification...")
             spec = await self.extract_app_specification(description)
+            print(f"   Entity: {spec.entity_name}, Fields: {len(spec.fields)}")
 
             # Step 2: Load appropriate template
+            print("📁 Step 2: Loading template...")
             template_files = self.load_template(spec.app_type)
 
             # Step 3: Generate code blocks with AI
+            print("🤖 Step 3: Generating custom code blocks...")
             code_blocks = await self.generate_code_blocks(spec)
 
             # Step 4: Inject code blocks into template
+            print("💉 Step 4: Injecting code into template...")
             files = self.inject_into_template(template_files, spec, code_blocks)
 
             # Step 5: Create app ID and package
@@ -115,6 +129,7 @@ Output ONLY the JSON."""
 
         try:
             response = await self._call_claude_api(prompt)
+            print(f"   AI Response: {response[:200]}...")
             # Extract JSON from response
             pattern = r'\{.*\}'
             json_match = re.search(pattern, response, re.DOTALL)
@@ -129,12 +144,16 @@ Output ONLY the JSON."""
                     description=spec_data.get('description', description),
                     fields=fields
                 )
+                print(f"   ✅ Extracted spec for: {spec.entity_name}")
                 return spec
             else:
                 raise ValueError("No JSON found in AI response")
 
         except Exception as e:
-            print(f"⚠️ Failed to extract spec: {e}. Using generic spec.")
+            print(f"❌ Failed to extract spec: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            print("⚠️ Using generic fallback spec.")
             # Fallback to generic item manager
             return self._get_generic_spec(description)
 
@@ -668,28 +687,48 @@ pydantic==2.6.4"""
         if not self.api_key:
             raise ValueError("OPENROUTER_API_KEY not set in environment. Get free $5 credits at https://openrouter.ai/")
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            # OpenRouter API (OpenAI-compatible format)
-            response = await client.post(
-                self.api_base,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "HTTP-Referer": "https://github.com/AVENGERSTHE2102/AI_webbuilder",
-                    "X-Title": "Zero-Code AI App Builder",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "max_tokens": 4096,
-                    "temperature": 0.7
-                }
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result['choices'][0]['message']['content']
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                # OpenRouter API (OpenAI-compatible format)
+                response = await client.post(
+                    self.api_base,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "HTTP-Referer": "https://github.com/AVENGERSTHE2102/AI_webbuilder",
+                        "X-Title": "Zero-Code AI App Builder",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 4096,
+                        "temperature": 0.7
+                    }
+                )
+
+                # Check for errors
+                if response.status_code != 200:
+                    error_text = response.text
+                    print(f"❌ OpenRouter API Error ({response.status_code}): {error_text}")
+                    raise ValueError(f"API returned {response.status_code}: {error_text}")
+
+                result = response.json()
+
+                # Check for error in response
+                if 'error' in result:
+                    print(f"❌ OpenRouter API Error: {result['error']}")
+                    raise ValueError(f"API Error: {result['error']}")
+
+                return result['choices'][0]['message']['content']
+
+        except httpx.HTTPError as e:
+            print(f"❌ HTTP Error calling OpenRouter: {type(e).__name__}: {str(e)}")
+            raise
+        except Exception as e:
+            print(f"❌ Error calling OpenRouter API: {type(e).__name__}: {str(e)}")
+            raise
 
 
 # Singleton instance
