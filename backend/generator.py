@@ -116,7 +116,8 @@ Output ONLY the JSON."""
         try:
             response = await self._call_claude_api(prompt)
             # Extract JSON from response
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            pattern = r'\{.*\}'
+            json_match = re.search(pattern, response, re.DOTALL)
             if json_match:
                 spec_data = json.loads(json_match.group())
                 # Convert to AppSpecification
@@ -230,11 +231,13 @@ IMPORTANT:
 - Code should be production-ready
 
 Output ONLY the JSON with these 4 code blocks.
+"""
 
         try:
             response = await self._call_claude_api(prompt)
             # Extract JSON
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            pattern = r'\{.*\}'
+            json_match = re.search(pattern, response, re.DOTALL)
             if json_match:
                 blocks_data = json.loads(json_match.group())
                 return CodeBlocks(**blocks_data)
@@ -541,14 +544,16 @@ async def delete_{spec.entity_name_lower}(item_id: int):
             label = field.name.replace('_', ' ').replace('Time', ' Time').replace('Date', ' Date').title()
 
             if field.type in ["List[str]", "list"]:
-                list_item_content.append(f"""                <div className="field-section">
+                # Build this without f-string to avoid backslash issues
+                field_code = """                <div className="field-section">
                   <strong>{label}:</strong>
                   <ul className="field-list">
-                    {{item.{field.name} && item.{field.name}.split('\\n').filter(line => line.trim()).map((line, i) => (
-                      <li key={{i}}>{{line}}</li>
-                    ))}}
+                    {{{{item.{field_name} && item.{field_name}.split('\\n').filter(line => line.trim()).map((line, i) => (
+                      <li key={{{{i}}}}>{{{{line}}}}</li>
+                    ))}}}}
                   </ul>
-                </div>""")
+                </div>""".format(label=label, field_name=field.name)
+                list_item_content.append(field_code)
             elif field.type == "bool":
                 list_item_content.append(f"""                <div className="field-section">
                   <strong>{label}:</strong> {{item.{field.name} ? '✅ Yes' : '❌ No'}}
