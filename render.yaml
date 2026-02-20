@@ -20,7 +20,5 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: OPENROUTER_API_KEY
-        sync: false  # Set this in Render dashboard
-      - key: ANTHROPIC_API_KEY
-        sync: false  # Alternative to OpenRouter
+        sync: false  # Set this in Render dashboard - Get $5 free at https://openrouter.ai/
     healthCheckPath: /

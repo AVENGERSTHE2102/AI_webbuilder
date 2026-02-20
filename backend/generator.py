@@ -19,20 +19,9 @@ class AppGenerator:
     """AI-powered code generation with template injection"""
 
     def __init__(self):
-        # Support both OpenRouter and direct Anthropic API
-        self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
-        self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-
-        # Prefer OpenRouter if available
-        if self.openrouter_key:
-            self.api_key = self.openrouter_key
-            self.api_base = "https://openrouter.ai/api/v1/chat/completions"
-            self.use_openrouter = True
-        else:
-            self.api_key = self.anthropic_key
-            self.api_base = "https://api.anthropic.com/v1/messages"
-            self.use_openrouter = False
-
+        # OpenRouter API only
+        self.api_key = os.getenv("OPENROUTER_API_KEY")
+        self.api_base = "https://openrouter.ai/api/v1/chat/completions"
         self.model = "anthropic/claude-sonnet-4-20250514"
         self.templates_dir = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -512,7 +501,7 @@ pydantic==2.6.4"""
 
     async def _call_claude_api(self, prompt: str) -> str:
         """
-        Calls Claude API (via OpenRouter or direct) with the given prompt.
+        Calls Claude API via OpenRouter.
 
         Args:
             prompt: The prompt to send
@@ -521,51 +510,30 @@ pydantic==2.6.4"""
             AI response text
         """
         if not self.api_key:
-            raise ValueError("API key not set. Set OPENROUTER_API_KEY or ANTHROPIC_API_KEY in environment")
+            raise ValueError("OPENROUTER_API_KEY not set in environment. Get free $5 credits at https://openrouter.ai/")
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            if self.use_openrouter:
-                # OpenRouter API (OpenAI-compatible format)
-                response = await client.post(
-                    self.api_base,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "HTTP-Referer": "https://github.com/AVENGERSTHE2102/AI_webbuilder",
-                        "X-Title": "Zero-Code AI App Builder",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": [
-                            {"role": "user", "content": prompt}
-                        ],
-                        "max_tokens": 4096,
-                        "temperature": 0.7
-                    }
-                )
-                response.raise_for_status()
-                result = response.json()
-                return result['choices'][0]['message']['content']
-            else:
-                # Direct Anthropic API
-                response = await client.post(
-                    self.api_base,
-                    headers={
-                        "x-api-key": self.api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json"
-                    },
-                    json={
-                        "model": "claude-sonnet-4-5-20250929",
-                        "max_tokens": 4096,
-                        "messages": [
-                            {"role": "user", "content": prompt}
-                        ]
-                    }
-                )
-                response.raise_for_status()
-                result = response.json()
-                return result['content'][0]['text']
+            # OpenRouter API (OpenAI-compatible format)
+            response = await client.post(
+                self.api_base,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "HTTP-Referer": "https://github.com/AVENGERSTHE2102/AI_webbuilder",
+                    "X-Title": "Zero-Code AI App Builder",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 4096,
+                    "temperature": 0.7
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result['choices'][0]['message']['content']
 
 
 # Singleton instance
