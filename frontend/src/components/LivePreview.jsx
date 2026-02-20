@@ -62,10 +62,10 @@ function LivePreview({ files, appId }) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Live Preview</title>
-  <script crossorigin src="https://unpkg.com/react@19/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@19/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/axios@1.6.7/dist/axios.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.7/axios.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -152,17 +152,31 @@ function LivePreview({ files, appId }) {
   };
 
   const extractComponentCode = (appJsx) => {
-    // Remove imports (we're using CDN versions)
-    let code = appJsx.replace(/import.*from.*;/g, '');
+    // Remove all import statements (including multi-line)
+    let code = appJsx;
 
-    // Remove export default
-    code = code.replace(/export default App;?/g, '');
+    // Remove single-line imports: import ... from '...'
+    code = code.replace(/import\s+.*?from\s+['"].*?['"];?\s*/g, '');
+
+    // Remove CSS imports: import './App.css'
+    code = code.replace(/import\s+['"].*?\.css['"];?\s*/g, '');
+
+    // Remove any remaining import statements
+    code = code.replace(/import\s+.*?;?\s*/g, '');
+
+    // Remove export default and export statements
+    code = code.replace(/export\s+default\s+App;?/g, '');
+    code = code.replace(/export\s+default\s+/g, '');
+    code = code.replace(/export\s+\{.*?\};?/g, '');
 
     // Replace API_BASE_URL with localhost
-    code = code.replace(/const API_BASE_URL = .*?;/,
+    code = code.replace(/const API_BASE_URL\s*=\s*.*?;/,
       "const API_BASE_URL = 'http://localhost:8000';");
 
-    return code;
+    // Clean up extra whitespace
+    code = code.replace(/^\s*[\r\n]/gm, '');
+
+    return code.trim();
   };
 
   const addLog = (message, level = 'info') => {
